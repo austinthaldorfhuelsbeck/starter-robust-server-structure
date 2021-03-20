@@ -3,6 +3,8 @@ const app = express();
 const flips = require("./data/flips-data"); // reads, executes, returns `exports` object
 const counts = require("./data/counts-data");
 
+app.use(express.json());
+
 app.use("/counts/:countId", (req, res, next) => {
   const { countId } = req.params;
   const foundCount = counts[countId];
@@ -30,9 +32,20 @@ app.use("/flips/:flipId", (req, res, next) => {
   }
 });
 
-app.use("/flips", (req, res) => {
+app.get("/flips", (req, res) => {
   // define a handler for the path
   res.json({ data: flips }); // method to tell express to respond with JSON
+});
+
+app.post("/flips", (req, res, next) => {
+  const { data: { result } = {} } = req.body;
+  const newFlip = {
+    id: flips.length + 1, // Assign the next ID
+    result,
+  };
+  flips.push(newFlip);
+  counts[result] = counts[result] + 1; // Increment the counts
+  res.status(201).json({ data: newFlip });
 });
 
 // Not found handler
