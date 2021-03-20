@@ -1,6 +1,22 @@
 const express = require("express");
 const app = express();
 const flips = require("./data/flips-data"); // reads, executes, returns `exports` object
+const counts = require("./data/counts-data");
+
+app.use("/counts/:countId", (req, res, next) => {
+  const { countId } = req.params;
+  const foundCount = counts[countId];
+
+  if (foundCount === undefined) {
+    next(`Count id not found: ${countId}`);
+  } else {
+    res.json({ data: foundCount }); // Return a JSON object, not a number.
+  }
+});
+
+app.use("/counts", (req, res) => {
+  res.json({ data: counts });
+});
 
 app.use("/flips/:flipId", (req, res, next) => {
   // define a handler for the path
