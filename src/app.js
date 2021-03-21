@@ -1,10 +1,49 @@
 const express = require("express");
 const app = express();
-const flips = require("./data/flips-data"); // reads, executes, returns `exports` object
+
+const flips = require("./data/flips-data");
 const counts = require("./data/counts-data");
 
-function bodyHasResultProperty(req, res, next) {
-  const { data: { result } = {} } = req.body;
+app.use(express.json());
+
+app.get("/counts/:countId", (request, response, next) => {
+  const { countId } = request.params;
+  const foundCount = counts[countId];
+
+  if (foundCount === undefined) {
+    next({
+      status: 404,
+      message: `Count id not found: ${countId}`,
+    });
+  } else {
+    response.json({ data: foundCount });
+  }
+});
+
+app.get("/counts", (request, response) => {
+  response.json({ data: counts });
+});
+
+app.get("/flips/:flipId", (request, response, next) => {
+  const { flipId } = request.params;
+  const foundFlip = flips.find((flip) => flip.id === Number(flipId));
+
+  if (foundFlip) {
+    response.json({ data: foundFlip });
+  } else {
+    next({
+      status: 404,
+      message: `Flip id not found: ${flipId}`,
+    });
+  }
+});
+
+app.get("/flips", (request, response) => {
+  response.json({ data: flips });
+});
+
+function bodyHasResultProperty(request, response, next) {
+  const { data: { result } = {} } = request.body;
   if (result) {
     return next();
   }
@@ -14,65 +53,33 @@ function bodyHasResultProperty(req, res, next) {
   });
 }
 
-app.use(express.json());
+let lastFlipId = flips.reduce((maxId, flip) => Math.max(maxId, flip.id), 0);
 
-app.use("/counts/:countId", (req, res, next) => {
-  const { countId } = req.params;
-  const foundCount = counts[countId];
-
-  if (foundCount === undefined) {
-    next(`Count id not found: ${countId}`);
-  } else {
-    res.json({ data: foundCount }); // Return a JSON object, not a number.
-  }
-});
-
-app.use("/counts", (req, res) => {
-  res.json({ data: counts });
-});
-
-app.use("/flips/:flipId", (req, res, next) => {
-  // define a handler for the path
-  const { flipId } = req.params; // destructure flipId variable from params
-  const foundFlip = flips.find((flip) => flip.id === Number(flipId)); // find() flip by id
-
-  if (foundFlip) {
-    res.json({ data: foundFlip }); // send data containing foundFlip object to client as JSON
-  } else {
-    next(`Flip id not found: ${flipId}`); // next() with err message if not found
-  }
-});
-
-app.get("/flips", (req, res) => {
-  // define a handler for the path
-  res.json({ data: flips }); // method to tell express to respond with JSON
-});
-
-app.post(
-  "/flips",
-  bodyHasResultProperty, // Add validation middleware function
-  (req, res) => {
-    // Route handler no longer has validation code.
-    const { data: { result } = {} } = req.body;
+app.post("/flips", bodyHasResultProperty, (request, response, next) => {
+  const { data: { result } = {} } = request.body;
+  if (result) {
     const newFlip = {
-      id: flips.length + 1, // Assign the next ID
-      result: result,
+      id: ++lastFlipId, // Increment last id then assign as the current ID
+      result,
     };
     flips.push(newFlip);
-    res.status(201).json({ data: newFlip });
+    counts[result] = counts[result] + 1; // Increment the counts
+    response.status(201).json({ data: newFlip });
+  } else {
+    response.sendStatus(400);
   }
-);
+});
 
 // Not found handler
 app.use((request, response, next) => {
-  next(`Not found: ${request.originalUrl}`);
+  next({ status: 404, message: `Not found: ${request.originalUrl}` });
 });
 
 // Error handler
-app.use((error, req, res, next) => {
+app.use((error, request, response, next) => {
   console.error(error);
   const { status = 500, message = "Something went wrong!" } = error;
-  res.status(status).json({ error: message });
+  response.status(status).json({ error: message });
 });
 
 module.exports = app;
